@@ -29,11 +29,8 @@ class SubCategoryServices:
         existing_doc = await sub_categories.find_one({"sub_category_id": sub_category_id})
         if not existing_doc:
             raise HTTPException(status_code=404, detail=f"Sub-Category {sub_category_id} not found!")        
-        modified_fields = {}
-        for key, value in data.items():
-            if key in existing_doc and existing_doc[key] != value:
-                modified_fields[key] = {"old_value": existing_doc[key], "new_value": value}        
-        result = await sub_categories.update_one({"sub_category_id": sub_category_id}, {"$set": data})
+        dict_data=data.model_dump()       
+        result = await sub_categories.update_one({"sub_category_id": sub_category_id}, {"$set": dict_data})
         if result.modified_count:
             raise HTTPException(status_code=200, detail=f"Sub-Category {sub_category_id} updated!")
         else:
