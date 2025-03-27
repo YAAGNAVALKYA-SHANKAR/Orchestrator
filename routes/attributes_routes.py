@@ -3,28 +3,30 @@ from bson import ObjectId
 from general.database import attributes
 from models.attribute_model import AttributeBase
 from services.bulk_imp_exp import ImportExportService
-from services import create, update, find, delete, change_status
+from services.attribute_services import AttributeServices
+from services import change_status
 router = APIRouter()
-
+service=AttributeServices()
 @router.post("/")
-async def create_attribute(attribute: AttributeBase, created_by:str):
-    return await create.Create.create(data=attribute, created_by=created_by, collection=attributes, collection_type="Attribute", prefix="ATTR")
+
+async def create_attribute(attribute: AttributeBase):
+    return await service.create(data=attribute)
 
 @router.get("/{attribute_name}")
-async def get_attribute_by_name(attribute_name: str):
-    return await find.Find.get_doc_by_name(name=attribute_name, collection=attributes, collection_type="Attribute")
+async def get_attribute_by_name(attribute_id: str):
+    return await service.get_doc_by_name(attribute_id=attribute_id)
 
 @router.get("/")
 async def get_all_attributes():
-    return await find.Find.get_all_docs(collection=attributes, exclude_filter={"function": "ID_counter"})
+    return await service.get_all_docs()
 
-@router.put("/{attribute_name}")
-async def update_attribute(attribute_name: str, updated_data: AttributeBase, updated_by:str):
-    return await update.Update.update(name=attribute_name, updated_by=updated_by, data=updated_data, collection=attributes, collection_type="Attribute")
+@router.put("/{attribute_id}")
+async def update_attribute(attribute_id: str, updated_data: AttributeBase):
+    return await service.update(attribute_id=attribute_id, data=updated_data)
 
-@router.delete("/{attribute_name}")
-async def delete_attribute(attribute_name: str, deleted_by:str, reason:str):
-    return await delete.Delete.delete(name=attribute_name, deleted_by=deleted_by, reason=reason, collection=attributes, collection_type="Attribute")
+@router.delete("/{attribute_id}")
+async def delete_attribute(attribute_id: str):
+    return await service.delete(attribute_id=attribute_id)
 
 @router.post("/import/{file_path}")
 async def bulk_import_attributes(overwrite:bool, file_path: str, user:str):

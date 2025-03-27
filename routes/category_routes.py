@@ -3,28 +3,30 @@ from bson import ObjectId
 from general.database import categories
 from models.category_model import CategoryBase
 from services.bulk_imp_exp import ImportExportService
-from services import create, update, find, delete, change_status
+from services.category_services import CategoryServices
+from services import change_status
 router = APIRouter()
+service=CategoryServices()
 
 @router.post("/")
-async def create_category(category: CategoryBase, created_by:str):
-    return await create.Create.create(data=category, created_by=created_by, collection=categories, collection_type="Category", prefix="CAT")
+async def create_category(category: CategoryBase):
+    return await service.create(data=category)
 
-@router.get("/{category_name}")
-async def get_category_by_name(category_name: str):
-    return await find.Find.get_doc_by_name(name=category_name, collection=categories, collection_type="Category")
+@router.get("/{category_id}")
+async def get_category_by_name(category_id: str):
+    return await service.get_doc_by_name(category_id=category_id)
 
 @router.get("/")
 async def get_all_categories():
-    return await find.Find.get_all_docs(collection=categories, exclude_filter={"function": "ID_counter"})
+    return await service.get_all_docs()
 
-@router.put("/{category_name}")
-async def update_category(category_name: str, updated_data: CategoryBase, updated_by:str):
-    return await update.Update.update(name=category_name, updated_by=updated_by, data=updated_data, collection=categories, collection_type="Category")
+@router.put("/{category_id}")
+async def update_category(category_id: str, updated_data: CategoryBase):
+    return await service.update(category_id=category_id, data=updated_data)
 
-@router.delete("/{category_name}")
-async def delete_category(category_name: str, deleted_by:str, reason:str):
-    return await delete.Delete.delete(name=category_name, deleted_by=deleted_by, reason=reason, collection=categories, collection_type="Category")
+@router.delete("/{category_id}")
+async def delete_category(category_id: str):
+    return await service.delete(category_id=category_id)
 
 @router.post("/import/{file_path}")
 async def bulk_import_categories(overwrite:bool, file_path: str, user:str):

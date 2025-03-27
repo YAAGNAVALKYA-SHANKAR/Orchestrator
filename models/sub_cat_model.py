@@ -6,7 +6,7 @@ class StatusEnum(str, Enum):
     INACTIVE = "inactive"
 
 class SubCategoryBase(BaseModel):
-    name: str = Field(...)
-    type: str = Field(...)
-    desc: str = Field(...)
-    status: StatusEnum = StatusEnum.INACTIVE 
+    sub_category_name: str = Field(...)
+    sub_category_type: str = Field(...)
+    sub_category_desc: str = Field(...)
+    sub_category_status: StatusEnum = StatusEnum.INACTIVE 

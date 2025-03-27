@@ -47,8 +47,8 @@ async def init_db():
         print("Logs collection created!")
 
     # Ensure indexes are created
-    await categories.create_index([("name", ASCENDING)], unique=True)
-    await sub_categories.create_index([("subcategory_id", ASCENDING)], unique=True)
+    await categories.create_index([("category_name", ASCENDING)], unique=True)
+    await sub_categories.create_index([("sub_category_name", ASCENDING)], unique=True)
     await logs.create_index([("event", ASCENDING)])
     await attributes.create_index([("name", ASCENDING)], unique=True)
 
