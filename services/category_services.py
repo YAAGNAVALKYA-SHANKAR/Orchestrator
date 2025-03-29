@@ -1,6 +1,10 @@
-from fastapi import HTTPException
+import shutil, pandas, os
+from fastapi import HTTPException, UploadFile, File
+from fastapi.responses import JSONResponse
 from pymongo.errors import DuplicateKeyError
 from general.database import categories
+UPLOAD_DIR = "uploaded_files"
+os.makedirs(UPLOAD_DIR, exist_ok=True)
 class CategoryServices:
 #CREATE CATEGORY
     @staticmethod
@@ -40,7 +44,7 @@ class CategoryServices:
         
 # GET CATEGORY BY ID
     @staticmethod
-    async def get_doc_by_name(category_id):
+    async def get_category_by_name(category_id):
         doc = await categories.find_one({"category_id": category_id})
         if doc:
             doc["_id"] = str(doc["_id"])
@@ -49,7 +53,7 @@ class CategoryServices:
     
 # GET ALL CATEGORIES
     @staticmethod
-    async def get_all_docs():
+    async def get_all_categories():
         exclude_filter={"function": "ID_counter"}
         doc_cursor = categories.find()
         docs = await doc_cursor.to_list(length=None)
@@ -66,4 +70,57 @@ class CategoryServices:
             return HTTPException(status_code=200, detail=f"Category:{category_id} deleted successfully!")
         else:
             raise HTTPException(status_code=500, detail=f"Failed to delete Category:{category_id}!")
-    
+
+# BULK UPLOAD CATEGORIES
+    @staticmethod
+    async def bulk_upload(overwrite:bool, files: list[UploadFile] = File(...)):
+        results = []
+        
+        for file in files:
+            file_location = f"{UPLOAD_DIR}/{file.filename}"
+            
+            # Save the uploaded file
+            with open(file_location, "wb") as buffer:
+                shutil.copyfileobj(file.file, buffer)
+
+            try:
+                # Read and process CSV file
+                file_ext = os.path.splitext(file_location)[-1].lower()
+                if file_ext == ".csv":
+                    df = pandas.read_csv(file_location)
+                elif file_ext in [".xls", ".xlsx"]:
+                    df = pandas.read_excel(file_location)
+                else:
+                    raise HTTPException(status_code=415, detail="Unsupported file format!")
+                data = df.to_dict(orient="records")
+                if not data:
+                    raise HTTPException(status_code=404, detail=f"No Categories found!")
+                new_entries = []
+                skipped_count = 0
+                overwritten_count = 0 
+                for entry in data:
+                    name = entry.get("category_name")
+                    if not name:
+                        skipped_count += 1
+                        continue
+
+                    existing_doc = await categories.find_one({"category_name": name}, {"_id": 1})
+                    if existing_doc:
+                        if not overwrite:
+                            skipped_count += 1
+                            continue
+                        else:
+                            await categories.update_one({"category_name": name}, {"$set": entry})
+                            overwritten_count += 1
+                    else:
+                        new_entries.append(entry)
+                inserted_count = 0
+                if new_entries:
+                    print("New Entries:", new_entries)
+                    result = await categories.insert_many(new_entries)
+                    inserted_count = len(result.inserted_ids)
+        
+            except Exception as e:
+                results.append({"filename": file.filename, "error": str(e)})
+
+        return JSONResponse(content={"message": f"Import completed: {inserted_count} new, {overwritten_count} overwritten, {skipped_count} skipped.", "details": results})

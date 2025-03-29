@@ -1,4 +1,4 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, UploadFile, File
 from bson import ObjectId
 from general.database import sub_categories
 from models.sub_cat_model import SubCategoryBase
@@ -17,7 +17,7 @@ async def get_sub_category_by_id(sub_category_id: str):
 
 @router.get("/")
 async def get_all_sub_categories():
-    return await service.get_all_docs()
+    return await service.get_all_sub_categories()
 
 @router.put("/{sub_category_id}")
 async def update_category(sub_category_id: str, updated_data: SubCategoryBase):
@@ -27,9 +27,9 @@ async def update_category(sub_category_id: str, updated_data: SubCategoryBase):
 async def delete_category(sub_category_id: str):
     return await service.delete(sub_category_id=sub_category_id)
 
-@router.post("/import/{file_path}")
-async def bulk_import_sub_categories(overwrite:bool, file_path: str, user:str):
-    return await ImportExportService.bulk_import(overwrite,file_path=file_path, user=user, collection=sub_categories, collection_type="Sub-Categories")
+@router.post("/bulk_upload/")
+async def bulk_import_sub_categories(overwrite:bool, files: list[UploadFile] = File(...)):
+    return await service.bulk_upload(overwrite, files)
 
 @router.post("/export/{file_path}")
 async def bulk_export_sub_categories(file_path: str):

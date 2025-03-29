@@ -1,6 +1,10 @@
-from fastapi import HTTPException
+import pandas, os, shutil
+from fastapi import HTTPException, UploadFile, File
+from fastapi.responses import JSONResponse
 from pymongo.errors import DuplicateKeyError
 from general.database import sub_categories
+UPLOAD_DIR = "uploaded_files"
+os.makedirs(UPLOAD_DIR, exist_ok=True)
 class SubCategoryServices:
 #CREATE SUB_CATEGORY
     @staticmethod
@@ -21,7 +25,7 @@ class SubCategoryServices:
                 await sub_categories.update_one({"function": "ID_counter"},{"$inc": {"count": 1}})    
             return inserted_doc
         except DuplicateKeyError:
-            raise HTTPException(status_code=400, detail=f"Category must be unique!")
+            raise HTTPException(status_code=400, detail=f"Sub-Category must be unique!")
         
 # UPDATE SUB_CATEGORY
     @staticmethod
@@ -47,7 +51,7 @@ class SubCategoryServices:
     
 # GET ALL SUB_CATEGORIES
     @staticmethod
-    async def get_all_docs(exclude_filter={"function": "ID_counter"}):
+    async def get_all_sub_categories(exclude_filter={"function": "ID_counter"}):
         doc_cursor = sub_categories.find()
         docs = await doc_cursor.to_list(length=None)
         return [{**doc, "_id": str(doc["_id"])} for doc in docs if not all(doc.get(k) == v for k, v in exclude_filter.items())]
@@ -63,4 +67,57 @@ class SubCategoryServices:
             return HTTPException(status_code=200, detail=f"Sub-Category:{sub_category_id} deleted successfully!")
         else:
             raise HTTPException(status_code=500, detail=f"Failed to delete Sub-Category:{sub_category_id}!")
-    
+
+# BULK UPLOAD SUB-CATEGORIES
+    @staticmethod
+    async def bulk_upload(overwrite:bool, files: list[UploadFile] = File(...)):
+        results = []
+        
+        for file in files:
+            file_location = f"{UPLOAD_DIR}/{file.filename}"
+            
+            # Save the uploaded file
+            with open(file_location, "wb") as buffer:
+                shutil.copyfileobj(file.file, buffer)
+
+            try:
+                # Read and process CSV file
+                file_ext = os.path.splitext(file_location)[-1].lower()
+                if file_ext == ".csv":
+                    df = pandas.read_csv(file_location)
+                elif file_ext in [".xls", ".xlsx"]:
+                    df = pandas.read_excel(file_location)
+                else:
+                    raise HTTPException(status_code=415, detail="Unsupported file format!")
+                data = df.to_dict(orient="records")
+                if not data:
+                    raise HTTPException(status_code=404, detail=f"No Sub-Categories found!")
+                new_entries = []
+                skipped_count = 0
+                overwritten_count = 0 
+                for entry in data:
+                    name = entry.get("sub_category_name")
+                    if not name:
+                        skipped_count += 1
+                        continue
+
+                    existing_doc = await sub_categories.find_one({"sub_category_name": name}, {"_id": 1})
+                    if existing_doc:
+                        if not overwrite:
+                            skipped_count += 1
+                            continue
+                        else:
+                            await sub_categories.update_one({"sub_category_name": name}, {"$set": entry})
+                            overwritten_count += 1
+                    else:
+                        new_entries.append(entry)
+                inserted_count = 0
+                if new_entries:
+                    print("New Entries:", new_entries)
+                    result = await sub_categories.insert_many(new_entries)
+                    inserted_count = len(result.inserted_ids)
+        
+            except Exception as e:
+                results.append({"filename": file.filename, "error": str(e)})
+
+        return JSONResponse(content={"message": f"Import completed: {inserted_count} new, {overwritten_count} overwritten, {skipped_count} skipped.", "details": results})

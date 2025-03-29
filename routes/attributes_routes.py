@@ -1,4 +1,4 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, UploadFile, File
 from bson import ObjectId
 from general.database import attributes
 from models.attribute_model import AttributeBase
@@ -7,8 +7,8 @@ from services.attribute_services import AttributeServices
 from services import change_status
 router = APIRouter()
 service=AttributeServices()
-@router.post("/")
 
+@router.post("/")
 async def create_attribute(attribute: AttributeBase):
     return await service.create(data=attribute)
 
@@ -28,9 +28,9 @@ async def update_attribute(attribute_id: str, updated_data: AttributeBase):
 async def delete_attribute(attribute_id: str):
     return await service.delete(attribute_id=attribute_id)
 
-@router.post("/import/{file_path}")
-async def bulk_import_attributes(overwrite:bool, file_path: str, user:str):
-    return await ImportExportService.bulk_import(overwrite,file_path=file_path, user=user, collection=attributes, collection_type="Attributes")
+@router.post("/bulk_upload/")
+async def bulk_import_sub_categories(overwrite:bool, files: list[UploadFile] = File(...)):
+    return await service.bulk_upload(overwrite, files)
 
 @router.post("/export/{file_path}")
 async def bulk_export_attributes(file_path: str):
