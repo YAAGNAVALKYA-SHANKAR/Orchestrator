@@ -1,10 +1,8 @@
-import shutil, pandas, os
+import shutil, pandas, os, csv
 from fastapi import HTTPException, UploadFile, File
 from fastapi.responses import JSONResponse
 from pymongo.errors import DuplicateKeyError
 from general.database import categories
-UPLOAD_DIR = "uploaded_files"
-os.makedirs(UPLOAD_DIR, exist_ok=True)
 class CategoryServices:
 #CREATE CATEGORY
     @staticmethod
@@ -77,6 +75,7 @@ class CategoryServices:
         results = []
         
         for file in files:
+            UPLOAD_DIR="uploaded_files"
             file_location = f"{UPLOAD_DIR}/{file.filename}"
             
             # Save the uploaded file
@@ -124,3 +123,53 @@ class CategoryServices:
                 results.append({"filename": file.filename, "error": str(e)})
 
         return JSONResponse(content={"message": f"Import completed: {inserted_count} new, {overwritten_count} overwritten, {skipped_count} skipped.", "details": results})
+    
+#BULK DOWNLOAD CATEGORIES
+
+    @staticmethod
+    async def bulk_download(file_path):
+        cursor = categories.find({}, {"_id": 0})  # Exclude _id field
+        data = await cursor.to_list(length=None)
+
+        if not data:
+            raise HTTPException(status_code=404, detail=f"No categories found!")
+
+        dir_name = os.path.dirname(file_path)
+        if dir_name and not os.path.exists(dir_name):
+            os.makedirs(dir_name)
+
+        file_ext = os.path.splitext(file_path)[-1].lower()
+
+        if file_ext == ".csv":
+            keys = data[0].keys()
+            with open(file_path, "w", newline="", encoding="utf-8") as file:
+                writer = csv.DictWriter(file, fieldnames=keys)
+                writer.writeheader()
+                writer.writerows(data)
+            return {"detail": f"Categorites exported successfully!", "path": file_path}
+
+        elif file_ext in [".xls", ".xlsx"]:
+            df = pandas.DataFrame(data)
+            if file_ext == ".xls":
+                df.to_excel(file_path, index=False, engine="xlwriter")
+            elif file_ext == ".xlsx":
+                df.to_excel(file_path, index=False, engine="openpyxl")
+            return {"detail": f"Categories exported successfully!", "path": file_path}
+
+        else:
+            raise HTTPException(status_code=400, detail="Unsupported file format!")
+
+#CHANGE CATEGORY STATUS
+
+    @staticmethod
+    async def change_status(category_id: str, new_status: str):
+        existing_doc = await categories.find_one({"category_id": category_id})
+        if not existing_doc:
+            raise HTTPException(status_code=404, detail=f"Category not found")
+        
+        existing_doc.get("category_status", "Unknown")
+        result = await categories.update_one({"category_id": category_id}, {"$set": {"category_status": new_status}})
+        if result.modified_count:
+            raise HTTPException(status_code=200, detail="Category status changed successfully")        
+        else:
+            raise HTTPException(status_code=400, detail="No changes detected")        

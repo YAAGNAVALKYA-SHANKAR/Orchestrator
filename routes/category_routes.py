@@ -1,11 +1,9 @@
-import os
+import tkinter as tk
 from fastapi import APIRouter, UploadFile, File
-from bson import ObjectId
+from tkinter import filedialog
 from general.database import categories
 from models.category_model import CategoryBase
-from services.bulk_imp_exp import ImportExportService
 from services.category_services import CategoryServices
-from services import change_status
 router = APIRouter()
 service=CategoryServices()
 
@@ -33,10 +31,17 @@ async def delete_category(category_id: str):
 async def bulk_import_categories(overwrite:bool, files: list[UploadFile] = File(...)):
     return await service.bulk_upload(overwrite, files)
 
-@router.post("/export/{file_path}")
-async def bulk_export_categories(file_path: str):
-    return await ImportExportService.bulk_export(file_path=file_path, collection=categories, collection_type="Categories")
+@router.post("/export/")
+async def bulk_export_categories():
+    root = tk.Tk()
+    root.withdraw()
+    root.attributes('-topmost', True)
+    file_types = [("CSV File", "*.csv"),("Excel File", "*.xlsx"),("JSON File", "*.json"),]
+    file_path = filedialog.asksaveasfilename(title="Select Destination & File Type",filetypes=file_types,defaultextension=".csv")
+    if not file_path:
+        return {"error": "No destination selected."}
+    return await service.bulk_download(file_path)
 
 @router.post("/status")
-async def category_status(category_name: str, new_status: str, changed_by: str):
-    return await change_status.ChangeStatus.change_status(name=category_name , new_status=new_status, changed_by=changed_by, collection=categories, collection_type="Category")
+async def category_status(category_id: str, new_status: str):
+    return await service.change_status(category_id=category_id , new_status=new_status)

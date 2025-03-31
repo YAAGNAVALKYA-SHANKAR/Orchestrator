@@ -1,4 +1,4 @@
-import pandas, os, shutil
+import pandas, os, shutil, csv
 from fastapi import HTTPException, UploadFile, File
 from fastapi.responses import JSONResponse
 from pymongo.errors import DuplicateKeyError
@@ -74,6 +74,7 @@ class SubCategoryServices:
         results = []
         
         for file in files:
+            UPLOAD_DIR="uploaded_files"
             file_location = f"{UPLOAD_DIR}/{file.filename}"
             
             # Save the uploaded file
@@ -121,3 +122,53 @@ class SubCategoryServices:
                 results.append({"filename": file.filename, "error": str(e)})
 
         return JSONResponse(content={"message": f"Import completed: {inserted_count} new, {overwritten_count} overwritten, {skipped_count} skipped.", "details": results})
+    
+#BULK DOWNLOAD SUB-CATEGORIES
+
+    @staticmethod
+    async def bulk_download(file_path):
+        cursor = sub_categories.find({}, {"_id": 0})  # Exclude _id field
+        data = await cursor.to_list(length=None)
+
+        if not data:
+            raise HTTPException(status_code=404, detail=f"No Sub-Categopories found!")
+
+        dir_name = os.path.dirname(file_path)
+        if dir_name and not os.path.exists(dir_name):
+            os.makedirs(dir_name)
+
+        file_ext = os.path.splitext(file_path)[-1].lower()
+
+        if file_ext == ".csv":
+            keys = data[0].keys()
+            with open(file_path, "w", newline="", encoding="utf-8") as file:
+                writer = csv.DictWriter(file, fieldnames=keys)
+                writer.writeheader()
+                writer.writerows(data)
+            return {"detail": f"Sub-Categories exported successfully!", "path": file_path}
+
+        elif file_ext in [".xls", ".xlsx"]:
+            df = pandas.DataFrame(data)
+            if file_ext == ".xls":
+                df.to_excel(file_path, index=False, engine="xlwriter")
+            elif file_ext == ".xlsx":
+                df.to_excel(file_path, index=False, engine="openpyxl")
+            return {"detail": f"Sub-Categories exported successfully!", "path": file_path}
+
+        else:
+            raise HTTPException(status_code=400, detail="Unsupported file format!")
+
+#CHANGE SUB-CATEGORY STATUS
+
+    @staticmethod
+    async def change_status(sub_category_id: str, new_status: str):
+        existing_doc = await sub_categories.find_one({"sub_category_id": sub_category_id})
+        if not existing_doc:
+            raise HTTPException(status_code=404, detail=f"Sub-Category not found")
+        
+        existing_doc.get("sub_category_status", "Unknown")
+        result = await sub_categories.update_one({"sub_category_id": sub_category_id}, {"$set": {"sub_category_status": new_status}})
+        if result.modified_count:
+            raise HTTPException(status_code=200, detail="Sub-Category status changed successfully")        
+        else:
+            raise HTTPException(status_code=400, detail="No changes detected")        

@@ -24,6 +24,8 @@ attributes=db[ATTRIBUTES_COLLECTION_NAME]
 
 async def init_db():
     print("Initializing database...")
+    UPLOAD_DIR = "uploaded_files"
+    os.makedirs(UPLOAD_DIR, exist_ok=True)
     existing_collections = await db.list_collection_names()
 
     # Create collections if they don't exist

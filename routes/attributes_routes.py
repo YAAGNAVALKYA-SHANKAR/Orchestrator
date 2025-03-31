@@ -1,8 +1,8 @@
 from fastapi import APIRouter, UploadFile, File
-from bson import ObjectId
+import tkinter as tk
+from tkinter import filedialog
 from general.database import attributes
 from models.attribute_model import AttributeBase
-from services.bulk_imp_exp import ImportExportService
 from services.attribute_services import AttributeServices
 from services import change_status
 router = APIRouter()
@@ -32,10 +32,17 @@ async def delete_attribute(attribute_id: str):
 async def bulk_import_sub_categories(overwrite:bool, files: list[UploadFile] = File(...)):
     return await service.bulk_upload(overwrite, files)
 
-@router.post("/export/{file_path}")
-async def bulk_export_attributes(file_path: str):
-    return await ImportExportService.bulk_export(file_path=file_path, collection=attributes, collection_type="Attributes")
+@router.post("/export/")
+async def bulk_export_attributes():
+    root = tk.Tk()
+    root.withdraw()
+    root.attributes('-topmost', True)
+    file_types = [("CSV File", "*.csv"),("Excel File", "*.xlsx"),("JSON File", "*.json"),]
+    file_path = filedialog.asksaveasfilename(title="Select Destination & File Type",filetypes=file_types,defaultextension=".csv")
+    if not file_path:
+        return {"error": "No destination selected."}
+    return await service.bulk_download(file_path)
 
 @router.post("/status")
-async def attribute_status(attribute_name: str, new_status: str, changed_by: str):
-    return await change_status.ChangeStatus.change_status(name=attribute_name , new_status=new_status, changed_by=changed_by, collection=attributes, collection_type="Attribute")
+async def attribute_status(attribute_id: str, new_status: str):
+    return await service.change_status(attribute_id=attribute_id, new_status=new_status)
