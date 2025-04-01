@@ -128,7 +128,7 @@ class CategoryServices:
 
     @staticmethod
     async def bulk_download(file_path):
-        cursor = categories.find({}, {"_id": 0})  # Exclude _id field
+        cursor = categories.find({"function": {"$exists": False}}, {"_id": 0})
         data = await cursor.to_list(length=None)
 
         if not data:

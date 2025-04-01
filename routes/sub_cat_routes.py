@@ -2,7 +2,6 @@ from fastapi import APIRouter, UploadFile, File
 from bson import ObjectId
 from general.database import sub_categories
 from models.sub_cat_model import SubCategoryBase
-from services.bulk_imp_exp import ImportExportService
 from services.subcategory_services import SubCategoryServices
 from services import change_status
 router = APIRouter()
@@ -33,7 +32,7 @@ async def bulk_import_sub_categories(overwrite:bool, files: list[UploadFile] = F
 
 @router.post("/export/{file_path}")
 async def bulk_export_sub_categories(file_path: str):
-    return await ImportExportService.bulk_export(file_path=file_path, collection=sub_categories, collection_type="Sub-Categories")
+    return await service.bulk_download(file_path=file_path, collection=sub_categories, collection_type="Sub-Categories")
 
 @router.post("/status")
 async def category_status(sub_category_name: str, new_status: str, changed_by: str):
