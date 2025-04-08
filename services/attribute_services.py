@@ -11,7 +11,7 @@ class AttributeServices:
         counter_value=counter_doc["count"]if counter_doc else 0
         attribute_data["attribute_id"]=f"ATTR_{counter_value:04d}"
         existing_doc=await attributes.find_one({"attribute_name":attribute_data["attribute_name"]})
-        if existing_doc:raise HTTPException(status_code=400,detail=f"Attribute {attribute_data["attribute_name"]} already exists!")        
+        if existing_doc:raise HTTPException(status_code=400,detail=f"Attribute {attribute_data['attribute_name']} already exists!")        
         try:
             result=await attributes.insert_one(attribute_data)
             inserted_doc=await attributes.find_one({"_id":result.inserted_id})
